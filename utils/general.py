@@ -35,6 +35,7 @@ def set_logging(rank=-1):
 
 
 def init_seeds(seed=0):
+    # Initialize random number generator (RNG) seeds
     random.seed(seed)
     np.random.seed(seed)
     init_torch_seeds(seed)
@@ -46,12 +47,36 @@ def get_latest_run(search_dir='.'):
     return max(last_list, key=os.path.getctime) if last_list else ''
 
 
+def check_online():
+    # Check internet connectivity
+    import socket
+    try:
+        socket.create_connection(("1.1.1.1", 53))  # check host accesability
+        return True
+    except OSError:
+        return False
+
+
 def check_git_status():
-    # Suggest 'git pull' if repo is out of date
-    if Path('.git').exists() and platform.system() in ['Linux', 'Darwin'] and not Path('/.dockerenv').is_file():
-        s = subprocess.check_output('if [ -d .git ]; then git fetch && git status -uno; fi', shell=True).decode('utf-8')
-        if 'Your branch is behind' in s:
-            print(s[s.find('Your branch is behind'):s.find('\n\n')] + '\n')
+    # Recommend 'git pull' if code is out of date
+    print(colorstr('github: '), end='')
+    try:
+        assert Path('.git').exists(), 'skipping check (not a git repository)'
+        assert not Path('/workspace').exists(), 'skipping check (Docker image)'  # not Path('/.dockerenv').exists()
+        assert check_online(), 'skipping check (offline)'
+
+        cmd = 'git fetch && git config --get remote.origin.url'
+        url = subprocess.check_output(cmd, shell=True).decode().strip().rstrip('.git')  # github repo url
+        branch = subprocess.check_output('git rev-parse --abbrev-ref HEAD', shell=True).decode().strip()  # checked out
+        n = int(subprocess.check_output(f'git rev-list {branch}..origin/master --count', shell=True))  # commits behind
+        if n > 0:
+            s = f"⚠️ WARNING: code is out of date by {n} commit{'s' * (n > 1)}. " \
+                f"Use 'git pull' to update or 'git clone {url}' to download latest."
+        else:
+            s = f'up to date with {url} ✅'
+        print(s.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else s)
+    except Exception as e:
+        print(e)
 
 
 def check_requirements(file='requirements.txt'):
@@ -118,7 +143,7 @@ def one_cycle(y1=0.0, y2=1.0, steps=100):
 
 def colorstr(*input):
     # Colors a string https://en.wikipedia.org/wiki/ANSI_escape_code, i.e.  colorstr('blue', 'hello world')
-    *prefix, string = input  # color arguments, string
+    *args, string = input if len(input) > 1 else ('blue', 'bold', input[0])  # color arguments, string
     colors = {'black': '\033[30m',  # basic colors
               'red': '\033[31m',
               'green': '\033[32m',
@@ -138,8 +163,7 @@ def colorstr(*input):
               'end': '\033[0m',  # misc
               'bold': '\033[1m',
               'underline': '\033[4m'}
-
-    return ''.join(colors[x] for x in prefix) + f'{string}' + colors['end']
+    return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
 
 
 def labels_to_class_weights(labels, nc=80):
@@ -198,6 +222,16 @@ def xywh2xyxy(x):
     y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
     y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    return y
+
+
+def xywhn2xyxy(x, w=640, h=640, padw=32, padh=32):
+    # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = w * (x[:, 0] - x[:, 2] / 2) + padw  # top left x
+    y[:, 1] = h * (x[:, 1] - x[:, 3] / 2) + padh  # top left y
+    y[:, 2] = w * (x[:, 0] + x[:, 2] / 2) + padw  # bottom right x
+    y[:, 3] = h * (x[:, 1] + x[:, 3] / 2) + padh  # bottom right y
     return y
 
 

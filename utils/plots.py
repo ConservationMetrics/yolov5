@@ -245,9 +245,9 @@ def plot_study_txt(path='study/', x=None):  # from utils.plots import *; plot_st
              'k.-', linewidth=2, markersize=8, alpha=.25, label='EfficientDet')
 
     ax2.grid()
+    ax2.set_yticks(np.arange(30, 60, 5))
     ax2.set_xlim(0, 30)
     ax2.set_ylim(29, 51)
-    ax2.set_yticks(np.arange(30, 55, 5))
     ax2.set_xlabel('GPU Speed (ms/img)')
     ax2.set_ylabel('COCO AP val')
     ax2.legend(loc='lower right')
@@ -301,7 +301,7 @@ def plot_labels(labels, save_dir=Path(''), loggers=None):
 def plot_evolution(yaml_file='data/hyp.finetune.yaml'):  # from utils.plots import *; plot_evolution()
     # Plot hyperparameter evolution results in evolve.txt
     with open(yaml_file) as f:
-        hyp = yaml.load(f, Loader=yaml.FullLoader)
+        hyp = yaml.load(f, Loader=yaml.SafeLoader)
     x = np.loadtxt('evolve.txt', ndmin=2)
     f = fitness(x)
     # weights = (f - f.min()) ** 2  # for weighted results

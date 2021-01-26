@@ -6,7 +6,6 @@ import random
 import time
 from pathlib import Path
 from threading import Thread
-from warnings import warn
 
 import numpy as np
 import torch.distributed as dist
@@ -30,21 +29,15 @@ from utils.general import labels_to_class_weights, increment_path, labels_to_ima
     fitness, strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
     check_requirements, print_mutation, set_logging, one_cycle, colorstr
 from utils.google_utils import attempt_download
-from utils.loss import compute_loss
+from utils.loss import ComputeLoss
 from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first
 
 logger = logging.getLogger(__name__)
 
-try:
-    import wandb
-except ImportError:
-    wandb = None
-    logger.info("Install Weights & Biases for experiment logging via 'pip install wandb' (recommended)")
-
 
 def train(hyp, opt, device, tb_writer=None, wandb=None):
-    logger.info(colorstr('blue', 'bold', 'Hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+    logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
     save_dir, epochs, batch_size, total_batch_size, weights, rank = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank
 
@@ -66,7 +59,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     cuda = device.type != 'cpu'
     init_seeds(2 + rank)
     with open(opt.data) as f:
-        data_dict = yaml.load(f, Loader=yaml.FullLoader)  # data dict
+        data_dict = yaml.load(f, Loader=yaml.SafeLoader)  # data dict
     with torch_distributed_zero_first(rank):
         check_dataset(data_dict)  # check
     train_path = data_dict['train']
@@ -189,7 +182,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     dataloader, dataset = create_dataloader(train_path, imgsz, batch_size, gs, opt,
                                             hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect, rank=rank,
                                             world_size=opt.world_size, workers=opt.workers,
-                                            image_weights=opt.image_weights, quad=opt.quad)
+                                            image_weights=opt.image_weights, quad=opt.quad, prefix=colorstr('train: '))
     mlc = np.concatenate(dataset.labels, 0)[:, 0].max()  # max label class
     nb = len(dataloader)  # number of batches
     assert mlc < nc, 'Label class %g exceeds nc=%g in %s. Possible class labels are 0-%g' % (mlc, nc, opt.data, nc - 1)
@@ -198,8 +191,9 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     if rank in [-1, 0]:
         ema.updates = start_epoch * nb // accumulate  # set EMA updates
         testloader = create_dataloader(test_path, imgsz_test, total_batch_size, gs, opt,  # testloader
-                                       hyp=hyp, cache=opt.cache_images and not opt.notest, rect=True,
-                                       rank=-1, world_size=opt.world_size, workers=opt.workers, pad=0.5)[0]
+                                       hyp=hyp, cache=opt.cache_images and not opt.notest, rect=True, rank=-1,
+                                       world_size=opt.world_size, workers=opt.workers,
+                                       pad=0.5, prefix=colorstr('val: '))[0]
 
         if not opt.resume:
             labels = np.concatenate(dataset.labels, 0)
@@ -233,6 +227,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = amp.GradScaler(enabled=cuda)
+    compute_loss = ComputeLoss(model)  # init loss class
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
@@ -292,7 +287,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
             # Forward
             with amp.autocast(enabled=cuda):
                 pred = model(imgs)  # forward
-                loss, loss_items = compute_loss(pred, targets.to(device), model)  # loss scaled by batch_size
+                loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -324,8 +319,9 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                     # if tb_writer:
                     #     tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
                     #     tb_writer.add_graph(model, imgs)  # add model to tensorboard
-                elif plots and ni == 3 and wandb:
-                    wandb.log({"Mosaics": [wandb.Image(str(x), caption=x.name) for x in save_dir.glob('train*.jpg')]})
+                elif plots and ni == 10 and wandb:
+                    wandb.log({"Mosaics": [wandb.Image(str(x), caption=x.name) for x in save_dir.glob('train*.jpg')
+                                           if x.exists()]})
 
             # end batch ------------------------------------------------------------------------------------------------
         # end epoch ----------------------------------------------------------------------------------------------------
@@ -348,8 +344,10 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                                                  single_cls=opt.single_cls,
                                                  dataloader=testloader,
                                                  save_dir=save_dir,
+                                                 verbose=nc < 50 and final_epoch,
                                                  plots=plots and final_epoch,
-                                                 log_imgs=opt.log_imgs if wandb else 0)
+                                                 log_imgs=opt.log_imgs if wandb else 0,
+                                                 compute_loss=compute_loss)
 
             # Write
             with open(results_file, 'a') as f:
@@ -482,8 +480,8 @@ if __name__ == '__main__':
         assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
         apriori = opt.global_rank, opt.local_rank
         with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
-            opt = argparse.Namespace(**yaml.load(f, Loader=yaml.FullLoader))  # replace
-        opt.cfg, opt.weights, opt.resume, opt.global_rank, opt.local_rank = '', ckpt, True, *apriori  # reinstate
+            opt = argparse.Namespace(**yaml.load(f, Loader=yaml.SafeLoader))  # replace
+        opt.cfg, opt.weights, opt.resume, opt.batch_size, opt.global_rank, opt.local_rank = '', ckpt, True, opt.total_batch_size, *apriori  # reinstate
         logger.info('Resuming training from %s' % ckpt)
     else:
         # opt.hyp = opt.hyp or ('hyp.finetune.yaml' if opt.weights else 'hyp.scratch.yaml')
@@ -506,14 +504,16 @@ if __name__ == '__main__':
 
     # Hyperparameters
     with open(opt.hyp) as f:
-        hyp = yaml.load(f, Loader=yaml.FullLoader)  # load hyps
-        if 'box' not in hyp:
-            warn('Compatibility: %s missing "box" which was renamed from "giou" in %s' %
-                 (opt.hyp, 'https://github.com/ultralytics/yolov5/pull/1120'))
-            hyp['box'] = hyp.pop('giou')
+        hyp = yaml.load(f, Loader=yaml.SafeLoader)  # load hyps
 
     # Train
     logger.info(opt)
+    try:
+        import wandb
+    except ImportError:
+        wandb = None
+        prefix = colorstr('wandb: ')
+        logger.info(f"{prefix}Install Weights & Biases for YOLOv5 logging with 'pip install wandb' (recommended)")
     if not opt.evolve:
         tb_writer = None  # init loggers
         if opt.global_rank in [-1, 0]:
