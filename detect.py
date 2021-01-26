@@ -48,7 +48,7 @@ def detect(save_img=False):
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz)
     else:
-        save_img = True
+        save_img = False
         dataset = LoadImages(source, img_size=imgsz)
 
     # Get names and colors
@@ -88,28 +88,28 @@ def detect(save_img=False):
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
-            s += '%gx%g ' % img.shape[2:]  # print string
+            #s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += f'{n} {names[int(c)]}s, '  # add to string
+                #for c in det[:, -1].unique():
+                #    n = (det[:, -1] == c).sum()  # detections per class
+                #    s += f'{n} {names[int(c)]}s, '  # add to string
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
+                        line = (p.name, names[int(cls)], *xywh, conf) if opt.save_conf else (p.name,names[int(cls)], *xywh)  # label format
                         with open(txt_path + '.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                            f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
+                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
@@ -163,7 +163,11 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
     check_requirements()
+    
+    from argparse import Namespace
 
+
+    opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source=r'D:\datasets\USGS_AerialImage_2020\testdata20200429\USGS_AerialImages_2019_R1_sum19_tiled\20190517_02_S_Cam1\20190517_CAM12931_7661_1137.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'])
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
             for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
