@@ -16,7 +16,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
+    source, weights, view_img, save_txt, imgsz, save_xxyy = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size,opt.save_xxyy
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
 
@@ -67,12 +67,12 @@ def detect(save_img=False):
             img = img.unsqueeze(0)
 
         # Inference
-        t1 = time_synchronized()
+        #t1 = time_synchronized()
         pred = model(img, augment=opt.augment)[0]
 
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
-        t2 = time_synchronized()
+        #t2 = time_synchronized()
 
         # Apply Classifier
         if classify:
@@ -87,7 +87,15 @@ def detect(save_img=False):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+            #txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+            txt_path = str(save_dir / 'labels' / p.parent.name) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+            if not Path(txt_path + '.csv').exists():
+                with open(txt_path + '.csv', 'a') as f:
+                    if save_xxyy:
+                        f.write(("%s,%s,%s,%s,%s,%s,%s,%s,%s" % ('filename','class','x','y','w','h','height','width','box_confidence')+ '\n'))
+                    else:
+                        f.write(("%s,%s,%s,%s,%s,%s,%s,%s,%s" % ('filename','class','xmin','xmax','ymin','ymax','height','width','box_confidence')+ '\n'))
+
             #s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             if len(det):
@@ -103,9 +111,26 @@ def detect(save_img=False):
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (p.name, names[int(cls)], *xywh, conf) if opt.save_conf else (p.name,names[int(cls)], *xywh)  # label format
-                        with open(txt_path + '.txt', 'a') as f:
+                        if save_xxyy:
+                            xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                            line = (p.name, names[int(cls)], *xywh, gn[1],gn[0],conf) if opt.save_conf else (p.name,names[int(cls)], *xywh, gn[1], gn[0])  # label format
+                            with open(txt_path + '.csv', 'a') as f: 
+                                f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
+                        else:
+                            xxyy=[(torch.tensor(xyxy).view(1, 4)/ gn).view(-1).tolist()[i] for i in [0,2,1,3]]
+                            line = (p.name, names[int(cls)], *xxyy,gn[1],gn[0], conf) if opt.save_conf else (p.name,names[int(cls)], *xxyy,gn[1],gn[0])  # label format
+                            with open(txt_path + '.csv', 'a') as f:
+                                f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
+
+                    if save_img or view_img:  # Add bbox to image
+                        label = f'{names[int(cls)]} {conf:.2f}'
+                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+            elif len(det)==0:
+                    if save_txt:  # Write to file
+                        line=(p.name, 'NULL',0,0,0,0,gn[1],gn[0],0) if opt.save_conf else (p.name, 'NULL',0,0,0,0,gn[1],gn[0])  # label format
+
+                        with open(txt_path + '.csv', 'a') as f:
+#                           
                             f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
 
                     if save_img or view_img:  # Add bbox to image
@@ -113,7 +138,7 @@ def detect(save_img=False):
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
-            print(f'{s}Done. ({t2 - t1:.3f}s)')
+            # print(f'{s}Done. ({t2 - t1:.3f}s)')
 
             # Stream results
             if view_img:
@@ -158,6 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--update', action='store_true', help='update all models')
+    parser.add_argument('--save-xxyy', action='store_false', help='true to save xywh and false to save xxyy format')
     parser.add_argument('--project', default='runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
@@ -165,9 +191,11 @@ if __name__ == '__main__':
     print(opt)
     check_requirements()
     testing=False
+    
+    
     if testing:
         from argparse import Namespace
-        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source=r'D:\datasets\USGS_AerialImage_2020\testdata20200429\USGS_AerialImages_2019_R1_sum19_tiled\20190517_02_S_Cam1\20190517_CAM12931_7661_1137.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'])
+        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:\\datasets\\USGS_AerialImage_2020\\testdata20200429\\USGS_AerialImages_2019_R1_sum19_tiled\\20190517_02_S_Cam1', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'], save_xxyy=True)
     
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
