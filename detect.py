@@ -164,11 +164,11 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
     check_requirements()
+    testing=False
+    if testing:
+        from argparse import Namespace
+        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source=r'D:\datasets\USGS_AerialImage_2020\testdata20200429\USGS_AerialImages_2019_R1_sum19_tiled\20190517_02_S_Cam1\20190517_CAM12931_7661_1137.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'])
     
-    from argparse import Namespace
-
-
-    opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source=r'D:\datasets\USGS_AerialImage_2020\testdata20200429\USGS_AerialImages_2019_R1_sum19_tiled\20190517_02_S_Cam1\20190517_CAM12931_7661_1137.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'])
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
             for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
