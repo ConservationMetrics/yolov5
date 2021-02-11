@@ -16,7 +16,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz, save_xxyy = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size,opt.save_xxyy
+    source, weights, view_img, save_txt, imgsz, save_xxyy, tile_x, tile_y, object_size_px = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size,opt.save_xxyy,opt.tile_x, opt.tile_y, opt.object_size_px
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
 
@@ -60,39 +60,62 @@ def detect(save_img=False):
 #    if device.type != 'cpu':
 #        model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
     t0 = time.time()
-    length = math.ceil(opt.img_size/8)
+    #length = math.ceil(opt.img_size/8)
 
     for path, img, im0s, vid_cap in dataset:
-        ni = int(math.ceil(img.shape[1] / length))  # up-down
-        nj = int(math.ceil(img.shape[2] / length))  # left-right
+        img_height, img_width = img.shape[1:]
+        # devide in to chunks
+        n_x = math.ceil(img_width/tile_x)
+        n_y = math.ceil(img_height/tile_y)
+        height1=img_height/n_y
+        width1=img_width/n_x
+            
+        while ((img_height-height1)<object_size_px/2):
+              n_y=n_y+1
+              height1=img_height/n_y
+        
+        while ((img_width-width1)<object_size_px/2):
+              n_x=n_x+1
+              width1=img_width/n_x
+              
+        offset_x=math.floor(img_width/n_x)
+        offset_y=math.floor(img_height/n_y)
+        
+        # initialize out struct
         preds = []
-
-        for i in range(ni):  # for i in range(ni - 1):
-            print('row %g/%g: ' % (i, ni), end='')
-            for j in range(nj):  # for j in range(nj if i==0 else nj - 1):
-                print('%g ' % j, end='', flush=True)
-
-                # forward scan
-                y2 = min((i + 1) * length, img.shape[1])
-                y1 = y2 - length
-                x2 = min((j + 1) * length, img.shape[2])
-                x1 = x2 - length
-                chip = torch.from_numpy(img[:, y1:y2, x1:x2]).to(device)
+        # loop to subset into each crop
+        for i in range(n_y): 
+            for j in range(n_x):
+              
+                #logic to make overlapping tiles after the first iteration
+                if i==0:
+                    offset_y_new=offset_y*i
+                else:
+                    offset_y_new=(offset_y*i)-(tile_y-offset_y)
+                
+                if j==0:
+                    offset_x_new=offset_x*j
+                else:
+                    offset_x_new=(offset_x*j)-(tile_x-offset_x)
+                                            
+                # make crop
+                cropped_img = torch.from_numpy(img[:, offset_y_new:min(offset_y_new+tile_y, img_height), offset_x_new:min(offset_x_new+tile_x, img_width)]).to(device)
 
         #       img = torch.from_numpy(img).to(device)
-                chip = chip.half() if half else chip.float()  # uint8 to fp16/32
-                chip /= 255.0  # 0 - 255 to 0.0 - 1.0
-                if chip.ndimension() == 3:
-                    chip = chip.unsqueeze(0)
+                cropped_img = cropped_img.half() if half else cropped_img.float()  # uint8 to fp16/32
+                cropped_img /= 255.0  # 0 - 255 to 0.0 - 1.0
+                if cropped_img.ndimension() == 3:
+                    cropped_img = cropped_img.unsqueeze(0)
         
                 # Inference
                 #t1 = time_synchronized()
-                pred = model(chip, augment=opt.augment)[0]
+                pred = model(cropped_img, augment=opt.augment)[0]
 
                 if len(pred) > 0:
-                    pred[:,:, 0] += x1
-                    pred[:,:, 1] += y1
-                    preds.append(pred)
+                    pred[:,:, 0] += offset_x_new
+                    pred[:,:, 1] += offset_y_new
+                    preds.append(pred)                
+      
         # Apply NMS
         pred = non_max_suppression(torch.cat(preds, 1), opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
         #t2 = time_synchronized()
@@ -192,11 +215,15 @@ def detect(save_img=False):
     print(f'Done. ({time.time() - t0:.3f}s)')
 
 
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='source')  # file/folder, 0 for webcam
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
+    parser.add_argument('--object-size-px', type=int, default=30, help='object size (pixels)')
+    parser.add_argument('--tile-x', type=int, default=608, help='tile size x (pixels)')
+    parser.add_argument('--tile-y', type=int, default=1024, help='tile size y (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -220,7 +247,7 @@ if __name__ == '__main__':
     if testing:
         from argparse import Namespace
 #        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:\\datasets\\USGS_AerialImage_2020\\testdata20200429\\USGS_AerialImages_2019_R1_sum19_tiled\\20190517_02_S_Cam1', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'], save_xxyy=True)
-        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=8688, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:/CM,Inc/Dropbox (CMI)/CMI_Team/Analysis/2019/USGS_AerialImage_2019/test_cvat_export/full_images', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=False)
+        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=8688, object_size_px=30, tile_x=1024, tile_y=608, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:/CM,Inc/Dropbox (CMI)/CMI_Team/Analysis/2019/USGS_AerialImage_2019/test_cvat_export/full_images/20181016_CAM21628.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=False)
     
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
