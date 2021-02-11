@@ -197,7 +197,7 @@ if __name__ == '__main__':
     
     if testing:
         from argparse import Namespace
-        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:\\datasets\\USGS_AerialImage_2020\\testdata20200429\\USGS_AerialImages_2019_R1_sum19_tiled\\20190517_02_S_Cam1', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'], save_xxyy=True)
+        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:\\datasets\\USGS_AerialImage_2020\\testdata20200429\\USGS_AerialImages_2019_R1_sum19_tiled\\20190517_02_S_Cam1', update=False, view_img=False,  weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=True)
     
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
