@@ -49,7 +49,7 @@ def detect(save_img=False):
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
     else:
-        save_img = False
+        save_img = True
         dataset = LoadImages(source, img_size=imgsz, stride=stride)
 
     # Get names and colors
@@ -134,9 +134,7 @@ def detect(save_img=False):
 #                           
                             f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
 
-                    if save_img or view_img:  # Add bbox to image
-                        label = f'{names[int(cls)]} {conf:.2f}'
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                   
 
             # Print time (inference + NMS)
             # print(f'{s}Done. ({t2 - t1:.3f}s)')
