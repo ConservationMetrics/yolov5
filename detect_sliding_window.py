@@ -16,7 +16,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz, save_xxyy, tile_x, tile_y, object_size_px = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size,opt.save_xxyy,opt.tile_x, opt.tile_y, opt.object_size_px
+    source, weights, view_img, save_img, save_txt, imgsz, save_xxyy, tile_x, tile_y, object_size_px = opt.source, opt.weights, opt.view_img, opt.save_img, opt.save_txt, opt.img_size,opt.save_xxyy,opt.tile_x, opt.tile_y, opt.object_size_px
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
 
@@ -49,7 +49,7 @@ def detect(save_img=False):
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
     else:
-        save_img = False
+        #save_img = False
         dataset = LoadImages(source, img_size=imgsz, stride=stride)
 
     # Get names and colors
@@ -63,6 +63,7 @@ def detect(save_img=False):
     #length = math.ceil(opt.img_size/8)
 
     for path, img, im0s, vid_cap in dataset:
+        
         img_height, img_width = img.shape[1:]
         # devide in to chunks
         n_x = math.ceil(img_width/tile_x)
@@ -179,10 +180,6 @@ def detect(save_img=False):
 #                           
                             f.write(('%s, '+'%s, '+('%g, ' * (len(line)-3)+'%g').rstrip()) % line + '\n')
 
-                    if save_img or view_img:  # Add bbox to image
-                        label = f'{names[int(cls)]} {conf:.2f}'
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-
             # Print time (inference + NMS)
             # print(f'{s}Done. ({t2 - t1:.3f}s)')
 
@@ -229,6 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--view-img', action='store_true', help='display results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
+    parser.add_argument('--save-img', action='store_true', help='save results to image/movie file')
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --class 0, or --class 0 2 3')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
@@ -247,7 +245,9 @@ if __name__ == '__main__':
     if testing:
         from argparse import Namespace
 #        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.01, device='', exist_ok=False, img_size=1024, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:\\datasets\\USGS_AerialImage_2020\\testdata20200429\\USGS_AerialImages_2019_R1_sum19_tiled\\20190517_02_S_Cam1', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000\train1000_pmAP_l\weights\best.pt'], save_xxyy=True)
-        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=8688, object_size_px=30, tile_x=1024, tile_y=608, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:/CM,Inc/Dropbox (CMI)/CMI_Team/Analysis/2019/USGS_AerialImage_2019/test_cvat_export/full_images/20181016_CAM21628.JPG', update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=False)
+        #opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=8688, object_size_px=30, tile_x=1024, tile_y=608, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_img=False,save_txt=True, source="D:/CM,Inc/Dropbox (CMI)/CMI_Team/Analysis/2019/USGS_AerialImage_2019/CVAT_test_images*", update=False, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=False)
+        #opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=4000, object_size_px=30, tile_x=1024, tile_y=608, iou_thres=0.3, name='test', project='test_test', save_conf=True, save_txt=True, source='D:/DJI_0648.MP4', update=False, save_img=True, view_img=False, weights=[r'D:\yolo_models\USGS_AerialImages_2020\train1000_v2\train1000_v2_pmAP_l_mosaic_flip_loscale\weights\best.pt'], save_xxyy=False)
+        opt=Namespace(agnostic_nms=False, augment=False, classes=None, conf_thres=0.5, device='', exist_ok=False, img_size=10000, object_size_px=16, tile_x=500, tile_y=250, iou_thres=0.3, name='pb_big_tile', project='pb_big_tile', save_conf=True, save_txt=True, source='D:/croz_20201129_v1_tiled-3-4.tif', update=False, save_img=True, view_img=False, weights=[r'D:/CM,Inc/Dropbox (CMI)/CMI_Team/Analysis/2019/PointBlue_Penguins_2019/models/exp42/weights/best.pt'], save_xxyy=False)
     
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
