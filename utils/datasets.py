@@ -13,6 +13,9 @@ from pathlib import Path
 from threading import Thread
 
 import cv2
+import skimage.io
+from skimage.util import img_as_ubyte
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -176,7 +179,12 @@ class LoadImages:  # for inference
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path)  # BGR
+            img0 = cv2.imread(path) # 512x512
+            if img0 is None:
+                print('img no read, trying skimage')
+                img0 = skimage.io.imread(path)
+                img0 = img_as_ubyte(img0[:, :, [2,1,0]])
+                    
             assert img0 is not None, 'Image Not Found ' + path
             #print(f'image {self.count}/{self.nf} {path}: ', end='')
 
