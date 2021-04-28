@@ -15,7 +15,7 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
-def detect(save_img=False):
+def detect(opt,save_img=False):
     source, weights, view_img, save_txt, imgsz, save_xxyy = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size,opt.save_xxyy
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
@@ -49,7 +49,7 @@ def detect(save_img=False):
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
     else:
-        save_img = True
+        save_img = False
         dataset = LoadImages(source, img_size=imgsz, stride=stride)
 
     # Get names and colors
