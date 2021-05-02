@@ -121,8 +121,22 @@ class _RepeatSampler(object):
             yield from iter(self.sampler)
 
 
-class LoadImages:  # for inference
+class LoadImages(LoadFiles):  # for inference
     def __init__(self, path, img_size=640, stride=32):
+        p = str(Path(path).absolute())  # os-agnostic absolute path
+        if '*' in p:
+            files = sorted(glob.glob(os.path.join(p,'**/*.JPG'), recursive=True))  # glob
+        elif os.path.isdir(p):
+            files = sorted(glob.glob(os.path.join(p, '*.*')))  # dir
+        elif os.path.isfile(p):
+            files = [p]  # files
+        else:
+            raise Exception(f'ERROR: {p} does not exist')
+        super().__init__(files, img_size, stride)
+
+
+class LoadFiles:  # for inference
+    def __init__(self, files, img_size=640, stride=32):
         p = str(Path(path).absolute())  # os-agnostic absolute path
         if '*' in p:
             files = sorted(glob.glob(os.path.join(p,'**/*.JPG'), recursive=True))  # glob
@@ -184,7 +198,7 @@ class LoadImages:  # for inference
                 print('img no read, trying skimage')
                 img0 = skimage.io.imread(path)
                 img0 = img_as_ubyte(img0[:, :, [2,1,0]])
-                    
+
             assert img0 is not None, 'Image Not Found ' + path
             #print(f'image {self.count}/{self.nf} {path}: ', end='')
 
