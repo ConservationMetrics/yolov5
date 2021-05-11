@@ -1,4 +1,4 @@
-#python detect_sliding_window.py --weights {model_path} --img 1024 --conf 0.01 --iou-thres 0.3 --source "/home/cmi/datasets/fullimages/*" --project fullimage_preds --name {name_out} --save-txt --save-conf --save-xxyy --object-size-px 30 --tile-x 1024 --tile-y 608
+# python detect_sliding_window.py --weights {model_path} --img 1024 --conf 0.01 --iou-thres 0.3 --source "/home/cmi/datasets/fullimages/*" --project fullimage_preds --name {name_out} --save-txt --save-conf --save-xxyy --object-size-px 30 --tile-x 1024 --tile-y 608
 
 import argparse
 import time
@@ -219,7 +219,8 @@ def detect(opt, save_img=False):
                         "height",
                         "width",
                         "box_confidence",
-                ))
+                    )
+                )
             else:
                 lines_to_write_to_file.append(
                     (
@@ -275,9 +276,7 @@ def detect(opt, save_img=False):
                         )
                     else:
                         xxyy = [
-                            (torch.tensor(xyxy).view(1, 4) / gn)
-                            .view(-1)
-                            .tolist()[i]
+                            (torch.tensor(xyxy).view(1, 4) / gn).view(-1).tolist()[i]
                             for i in [0, 2, 1, 3]
                         ]
                         line = (
@@ -311,11 +310,7 @@ def detect(opt, save_img=False):
                     else (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0])
                 )  # label format
                 lines_to_write_to_file.append(
-                    (
-                        "%s, "
-                        + "%s, "
-                        + ("%g, " * (len(line) - 3) + "%g").rstrip()
-                    )
+                    ("%s, " + "%s, " + ("%g, " * (len(line) - 3) + "%g").rstrip())
                     % line
                 )
 
@@ -417,9 +412,7 @@ if __name__ == "__main__":
         action="store_true",
         help="existing project/name ok, do not increment",
     )
-     parser.add_argument(
-        "--save-dir", default=None, help="where to save output CSV?"
-    )
+    parser.add_argument("--save-dir", default=None, help="where to save output CSV?")
     opt = parser.parse_args()
     print(opt)
     check_requirements()
