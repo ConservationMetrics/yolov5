@@ -27,6 +27,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
 def detect(opt, save_img=False):
+    start_time = time.time()
     (
         source,
         source_files,
@@ -58,10 +59,14 @@ def detect(opt, save_img=False):
         or source.lower().startswith(("rtsp://", "rtmp://", "http://"))
     )
 
-    # Directories
-    save_dir = Path(
-        increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
-    )  # increment run
+    if opt.save_dir is None:
+        # Directories
+        save_dir = Path(
+            increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
+        )  # increment run
+    else:
+        save_dir = Path(opt.save_dir)
+
     (save_dir / "labels" if save_txt else save_dir).mkdir(
         parents=True, exist_ok=True
     )  # make dir
@@ -77,6 +82,7 @@ def detect(opt, save_img=False):
     imgsz = check_img_size(imgsz, s=stride)  # check img_size
     if half:
         model.half()  # to FP16
+    print(f"Loaded model in {time.time()-start_time}")
 
     # Second-stage classifier
     classify = False
@@ -110,7 +116,7 @@ def detect(opt, save_img=False):
     # length = math.ceil(opt.img_size/8)
 
     for path, img, im0s, vid_cap in dataset:
-
+        print(f"Processing image at {path}")
         img_height, img_width = img.shape[1:]
         # devide in to chunks
         n_x = math.ceil(img_width / tile_x)
@@ -199,44 +205,39 @@ def detect(opt, save_img=False):
             txt_path = str(save_dir / "labels" / p.parent.name) + (
                 "" if dataset.mode == "image" else f"_{frame}"
             )  # img.txt
-            if not Path(txt_path + ".csv").exists():
-                with open(txt_path + ".csv", "a") as f:
-                    if save_xxyy:
-                        f.write(
-                            (
-                                "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                                % (
-                                    "filename",
-                                    "class",
-                                    "x",
-                                    "y",
-                                    "w",
-                                    "h",
-                                    "height",
-                                    "width",
-                                    "box_confidence",
-                                )
-                                + "\n"
-                            )
+            lines_to_write_to_file = []
+            if save_xxyy:
+                lines_to_write_to_file.append(
+                    "%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                    % (
+                        "filename",
+                        "class",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "height",
+                        "width",
+                        "box_confidence",
+                ))
+            else:
+                lines_to_write_to_file.append(
+                    (
+                        "%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                        % (
+                            "filename",
+                            "class",
+                            "xmin",
+                            "xmax",
+                            "ymin",
+                            "ymax",
+                            "height",
+                            "width",
+                            "box_confidence",
                         )
-                    else:
-                        f.write(
-                            (
-                                "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                                % (
-                                    "filename",
-                                    "class",
-                                    "xmin",
-                                    "xmax",
-                                    "ymin",
-                                    "ymax",
-                                    "height",
-                                    "width",
-                                    "box_confidence",
-                                )
-                                + "\n"
-                            )
-                        )
+                        + "\n"
+                    )
+                )
 
             # s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -253,50 +254,46 @@ def detect(opt, save_img=False):
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
-                    if save_txt:  # Write to file
-                        if save_xxyy:
-                            xywh = (
-                                (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn)
-                                .view(-1)
-                                .tolist()
-                            )  # normalized xywh
-                            line = (
-                                (p.name, names[int(cls)], *xywh, gn[1], gn[0], conf)
-                                if opt.save_conf
-                                else (p.name, names[int(cls)], *xywh, gn[1], gn[0])
-                            )  # label format
-                            with open(txt_path + ".csv", "a") as f:
-                                f.write(
-                                    (
-                                        "%s, "
-                                        + "%s, "
-                                        + ("%g, " * (len(line) - 3) + "%g").rstrip()
-                                    )
-                                    % line
-                                    + "\n"
-                                )
-                        else:
-                            xxyy = [
-                                (torch.tensor(xyxy).view(1, 4) / gn)
-                                .view(-1)
-                                .tolist()[i]
-                                for i in [0, 2, 1, 3]
-                            ]
-                            line = (
-                                (p.name, names[int(cls)], *xxyy, gn[1], gn[0], conf)
-                                if opt.save_conf
-                                else (p.name, names[int(cls)], *xxyy, gn[1], gn[0])
-                            )  # label format
-                            with open(txt_path + ".csv", "a") as f:
-                                f.write(
-                                    (
-                                        "%s, "
-                                        + "%s, "
-                                        + ("%g, " * (len(line) - 3) + "%g").rstrip()
-                                    )
-                                    % line
-                                    + "\n"
-                                )
+                    if save_xxyy:
+                        xywh = (
+                            (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn)
+                            .view(-1)
+                            .tolist()
+                        )  # normalized xywh
+                        line = (
+                            (p.name, names[int(cls)], *xywh, gn[1], gn[0], conf)
+                            if opt.save_conf
+                            else (p.name, names[int(cls)], *xywh, gn[1], gn[0])
+                        )  # label format
+                        lines_to_write_to_file.append(
+                            (
+                                "%s, "
+                                + "%s, "
+                                + ("%g, " * (len(line) - 3) + "%g").rstrip()
+                            )
+                            % line
+                        )
+                    else:
+                        xxyy = [
+                            (torch.tensor(xyxy).view(1, 4) / gn)
+                            .view(-1)
+                            .tolist()[i]
+                            for i in [0, 2, 1, 3]
+                        ]
+                        line = (
+                            (p.name, names[int(cls)], *xxyy, gn[1], gn[0], conf)
+                            if opt.save_conf
+                            else (p.name, names[int(cls)], *xxyy, gn[1], gn[0])
+                        )  # label format
+                        lines_to_write_to_file.append(
+                            (
+                                "%s, "
+                                + "%s, "
+                                + ("%g, " * (len(line) - 3) + "%g").rstrip()
+                            )
+                            % line
+                            + "\n"
+                        )
 
                     if save_img or view_img:  # Add bbox to image
                         label = f"{names[int(cls)]} {conf:.2f}"
@@ -308,24 +305,19 @@ def detect(opt, save_img=False):
                             line_thickness=1,
                         )
             elif len(det) == 0:
-                if save_txt:  # Write to file
-                    line = (
-                        (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0], 0)
-                        if opt.save_conf
-                        else (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0])
-                    )  # label format
-
-                    with open(txt_path + ".csv", "a") as f:
-                        #
-                        f.write(
-                            (
-                                "%s, "
-                                + "%s, "
-                                + ("%g, " * (len(line) - 3) + "%g").rstrip()
-                            )
-                            % line
-                            + "\n"
-                        )
+                line = (
+                    (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0], 0)
+                    if opt.save_conf
+                    else (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0])
+                )  # label format
+                lines_to_write_to_file.append(
+                    (
+                        "%s, "
+                        + "%s, "
+                        + ("%g, " * (len(line) - 3) + "%g").rstrip()
+                    )
+                    % line
+                )
 
             # Print time (inference + NMS)
             # print(f'{s}Done. ({t2 - t1:.3f}s)')
@@ -335,6 +327,9 @@ def detect(opt, save_img=False):
                 cv2.imshow(str(p), im0)
                 cv2.waitKey(1)  # 1 millisecond
 
+            if save_txt:
+                with open(txt_path + "/" + str(uuid.uuid4()) + ".csv", "w") as f:
+                    f.write("\n".join(lines_to_write_to_file) + "\n")
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == "image":
@@ -353,6 +348,7 @@ def detect(opt, save_img=False):
                             save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h)
                         )
                     vid_writer.write(im0)
+            print(f"Done with image at {path} in {time.time()-t0}")
 
     #   if save_txt or save_img:
     #        s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
@@ -370,7 +366,7 @@ if __name__ == "__main__":
         "--source", type=str, default="data/images", help="source"
     )  # file/folder, 0 for webcam
     # a new argument
-    parser.add_argument("--source-files", type=lambda t: t.split(","), nargs="+")
+    parser.add_argument("--source-files", nargs="+", default=[])
     parser.add_argument(
         "--img-size", type=int, default=640, help="inference size (pixels)"
     )
@@ -421,6 +417,9 @@ if __name__ == "__main__":
         action="store_true",
         help="existing project/name ok, do not increment",
     )
+     parser.add_argument(
+        "--save-dir", default=None, help="where to save output CSV?"
+    )
     opt = parser.parse_args()
     print(opt)
     check_requirements()
@@ -462,7 +461,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
             for opt.weights in ["yolov5s.pt", "yolov5m.pt", "yolov5l.pt", "yolov5x.pt"]:
-                detect()
+                detect(opt)
                 strip_optimizer(opt.weights)
         else:
-            detect()
+            detect(opt)
