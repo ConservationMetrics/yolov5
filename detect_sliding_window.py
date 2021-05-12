@@ -233,7 +233,6 @@ def detect(opt, save_img=False):
                             "width",
                             "box_confidence",
                         )
-                        + "\n"
                     )
                 )
 
@@ -288,7 +287,6 @@ def detect(opt, save_img=False):
                                 + ("%g, " * (len(line) - 3) + "%g").rstrip()
                             )
                             % line
-                            + "\n"
                         )
 
                     if save_img or view_img:  # Add bbox to image
