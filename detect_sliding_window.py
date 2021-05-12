@@ -320,7 +320,7 @@ def detect(opt, save_img=False):
                 cv2.waitKey(1)  # 1 millisecond
 
             if save_txt:
-                with open(save_dir / str(uuid.uuid4()) + ".csv", "w+") as f:
+                with open(save_dir / (str(uuid.uuid4()) + ".csv"), "w+") as f:
                     f.write("\n".join(lines_to_write_to_file) + "\n")
             # Save results (image with detections)
             if save_img:
