@@ -202,10 +202,6 @@ def detect(opt, save_img=False):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
-            # txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
-            txt_path = str(save_dir / "labels" / p.parent.name) + (
-                "" if dataset.mode == "image" else f"_{frame}"
-            )  # img.txt
             lines_to_write_to_file = []
             if save_xxyy:
                 lines_to_write_to_file.append(
@@ -263,9 +259,9 @@ def detect(opt, save_img=False):
                             .tolist()
                         )  # normalized xywh
                         line = (
-                            (p.name, names[int(cls)], *xywh, gn[1], gn[0], conf)
+                            (str(p), names[int(cls)], *xywh, gn[1], gn[0], conf)
                             if opt.save_conf
-                            else (p.name, names[int(cls)], *xywh, gn[1], gn[0])
+                            else (str(p), names[int(cls)], *xywh, gn[1], gn[0])
                         )  # label format
                         lines_to_write_to_file.append(
                             (
@@ -281,9 +277,9 @@ def detect(opt, save_img=False):
                             for i in [0, 2, 1, 3]
                         ]
                         line = (
-                            (p.name, names[int(cls)], *xxyy, gn[1], gn[0], conf)
+                            (str(p), names[int(cls)], *xxyy, gn[1], gn[0], conf)
                             if opt.save_conf
-                            else (p.name, names[int(cls)], *xxyy, gn[1], gn[0])
+                            else (str(p), names[int(cls)], *xxyy, gn[1], gn[0])
                         )  # label format
                         lines_to_write_to_file.append(
                             (
@@ -306,9 +302,9 @@ def detect(opt, save_img=False):
                         )
             elif len(det) == 0:
                 line = (
-                    (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0], 0)
+                    (str(p), "NULL", 0, 0, 0, 0, gn[1], gn[0], 0)
                     if opt.save_conf
-                    else (p.name, "NULL", 0, 0, 0, 0, gn[1], gn[0])
+                    else (str(p), "NULL", 0, 0, 0, 0, gn[1], gn[0])
                 )  # label format
                 lines_to_write_to_file.append(
                     ("%s, " + "%s, " + ("%g, " * (len(line) - 3) + "%g").rstrip())
@@ -324,7 +320,7 @@ def detect(opt, save_img=False):
                 cv2.waitKey(1)  # 1 millisecond
 
             if save_txt:
-                with open(txt_path + "/" + str(uuid.uuid4()) + ".csv", "w") as f:
+                with open(save_dir / str(uuid.uuid4()) + ".csv", "w+") as f:
                     f.write("\n".join(lines_to_write_to_file) + "\n")
             # Save results (image with detections)
             if save_img:
