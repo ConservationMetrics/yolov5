@@ -69,6 +69,10 @@ def detect(opt, save_img=False):
         save_dir = Path(opt.save_dir)
 
     output_path = save_dir / (str(uuid.uuid4()) + ".csv")
+    (save_dir / "labels" if save_txt else save_dir).mkdir(
+        parents=True, exist_ok=True
+    )  # make dir
+
     if save_txt:
         if save_xxyy:
             header = "%s,%s,%s,%s,%s,%s,%s,%s,%s" % (
