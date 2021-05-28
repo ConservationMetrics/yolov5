@@ -320,7 +320,7 @@ def detect(opt, save_img=False):
 
             if save_txt:
                 with open(output_path, "a+") as f:
-                    f.write("\n".join(lines_to_write_to_file))
+                    f.write("\n".join(lines_to_write_to_file) + "\n")
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == "image":
