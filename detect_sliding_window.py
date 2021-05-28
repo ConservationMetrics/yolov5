@@ -71,37 +71,31 @@ def detect(opt, save_img=False):
     output_path = save_dir / (str(uuid.uuid4()) + ".csv")
     if save_txt:
         if save_xxyy:
-            lines_to_write_to_file.append(
-                "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                % (
-                    "filename",
-                    "class",
-                    "x",
-                    "y",
-                    "w",
-                    "h",
-                    "height",
-                    "width",
-                    "box_confidence",
-                )
+            header = "%s,%s,%s,%s,%s,%s,%s,%s,%s" % (
+                "filename",
+                "class",
+                "x",
+                "y",
+                "w",
+                "h",
+                "height",
+                "width",
+                "box_confidence",
             )
         else:
-            lines_to_write_to_file.append(
-                (
-                    "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                    % (
-                        "filename",
-                        "class",
-                        "xmin",
-                        "xmax",
-                        "ymin",
-                        "ymax",
-                        "height",
-                        "width",
-                        "box_confidence",
-                    )
-                )
+            header = "%s,%s,%s,%s,%s,%s,%s,%s,%s" % (
+                "filename",
+                "class",
+                "xmin",
+                "xmax",
+                "ymin",
+                "ymax",
+                "height",
+                "width",
+                "box_confidence",
             )
+         with open(output_path, "w+") as f:
+             f.write(header + "\n")
 
     (save_dir / "labels" if save_txt else save_dir).mkdir(
         parents=True, exist_ok=True
