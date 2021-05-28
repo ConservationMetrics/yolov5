@@ -69,6 +69,39 @@ def detect(opt, save_img=False):
         save_dir = Path(opt.save_dir)
 
     output_path = save_dir / (str(uuid.uuid4()) + ".csv")
+    if save_txt:
+        if save_xxyy:
+            lines_to_write_to_file.append(
+                "%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                % (
+                    "filename",
+                    "class",
+                    "x",
+                    "y",
+                    "w",
+                    "h",
+                    "height",
+                    "width",
+                    "box_confidence",
+                )
+            )
+        else:
+            lines_to_write_to_file.append(
+                (
+                    "%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                    % (
+                        "filename",
+                        "class",
+                        "xmin",
+                        "xmax",
+                        "ymin",
+                        "ymax",
+                        "height",
+                        "width",
+                        "box_confidence",
+                    )
+                )
+            )
 
     (save_dir / "labels" if save_txt else save_dir).mkdir(
         parents=True, exist_ok=True
@@ -205,38 +238,6 @@ def detect(opt, save_img=False):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
-            if save_xxyy:
-                lines_to_write_to_file.append(
-                    "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                    % (
-                        "filename",
-                        "class",
-                        "x",
-                        "y",
-                        "w",
-                        "h",
-                        "height",
-                        "width",
-                        "box_confidence",
-                    )
-                )
-            else:
-                lines_to_write_to_file.append(
-                    (
-                        "%s,%s,%s,%s,%s,%s,%s,%s,%s"
-                        % (
-                            "filename",
-                            "class",
-                            "xmin",
-                            "xmax",
-                            "ymin",
-                            "ymax",
-                            "height",
-                            "width",
-                            "box_confidence",
-                        )
-                    )
-                )
 
             # s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -321,7 +322,7 @@ def detect(opt, save_img=False):
 
             if save_txt:
                 with open(output_path, "a+") as f:
-                    f.write("\n".join(lines_to_write_to_file) + "\n")
+                    f.write("\n".join(lines_to_write_to_file))
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == "image":
