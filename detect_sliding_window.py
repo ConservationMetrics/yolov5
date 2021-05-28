@@ -94,8 +94,8 @@ def detect(opt, save_img=False):
                 "width",
                 "box_confidence",
             )
-         with open(output_path, "w+") as f:
-             f.write(header + "\n")
+        with open(output_path, "w+") as f:
+            f.write(header + "\n")
 
     (save_dir / "labels" if save_txt else save_dir).mkdir(
         parents=True, exist_ok=True
