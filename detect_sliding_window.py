@@ -351,6 +351,9 @@ def detect(opt, save_img=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--gpu-only", action="store_true", help="fail unless can use GPU"
+    )
+    parser.add_argument(
         "--weights", nargs="+", type=str, default="yolov5s.pt", help="model.pt path(s)"
     )
     parser.add_argument(
@@ -411,6 +414,11 @@ if __name__ == "__main__":
     parser.add_argument("--save-dir", default=None, help="where to save output CSV?")
     opt = parser.parse_args()
     print(opt)
+
+    # https://stackoverflow.com/questions/48152674/how-to-check-if-pytorch-is-using-the-gpu
+    if opt.gpu_only and (not torch.cuda.is_available()):
+        raise Exception("Must use GPU, but couldn't initialize properly. Try again.")
+
     check_requirements()
     testing = False
 
